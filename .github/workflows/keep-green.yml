@@ -2,42 +2,48 @@ name: Keep Green
 
 on:
   schedule:
-    - cron: "0 12 * * 1-5"   # Runs Mon-Fri at 12:00 UTC
-  workflow_dispatch:          # Allows manual trigger
+    # Run at 10:00 UTC Mon–Fri
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch:
 
 jobs:
   commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
+        with:
+          persist-credentials: false
 
-      - name: Decide commit count
-        id: commits
+      - name: Setup Git
         run: |
-          # Pick a "random weekday" based on current week number
-          WEEK_NUM=$(date +%U)
-          RANDOM_DAY=$((WEEK_NUM % 5))   # 0=Mon .. 4=Fri
-          TODAY=$(date +%u)              # 1=Mon .. 7=Sun
+          git config user.name "faqirullahafridi"
+          git config user.email "196634821+faqirullahafridi@users.noreply.github.com"
 
-          if [ $TODAY -eq $((RANDOM_DAY+1)) ]; then
-            # If today is the random day → pick 3-5 commits
-            COUNT=$(( (RANDOM % 3) + 3 ))
-          else
-            # Otherwise → just 1 commit
-            COUNT=1
+      - name: Update Log
+        run: |
+          echo "Last run: $(date)" >> update.log
+
+      - name: Random Multi Commit
+        run: |
+          RANDOM_DAY=$(( (RANDOM % 5) + 1 ))
+          TODAY=$(date +%u)
+          if [ "$TODAY" -eq "$RANDOM_DAY" ]; then
+            echo "Doing multiple commits today..."
+            for i in {1..3}; do
+              echo "Extra commit $i on $(date)" >> update.log
+              git add update.log
+              git commit -m "Extra commit $i" || true
+            done
           fi
 
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
-
-      - name: Make commits
+      - name: Commit Changes
         run: |
-          for i in $(seq 1 ${{ steps.commits.outputs.count }}); do
-            echo "Run $i on $(date)" >> update.log
-            git config --global user.name "GitHub Action"
-            git config --global user.email "196634821+faqirullahafridi@users.noreply.github.com"
-            git add update.log
-            git commit -m "chore: keep green run $i on $(date)"
-            sleep 10
-          done
-          git push
+          git add update.log
+          git commit -m "Keep Green commit on $(date)" || echo "No changes to commit"
+
+      - name: Push
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: main
