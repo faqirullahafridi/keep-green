@@ -1,0 +1,43 @@
+name: Keep Green
+
+on:
+  schedule:
+    - cron: "0 12 * * 1-5"   # Runs Mon-Fri at 12:00 UTC
+  workflow_dispatch:          # Allows manual trigger
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Decide commit count
+        id: commits
+        run: |
+          # Pick a "random weekday" based on current week number
+          WEEK_NUM=$(date +%U)
+          RANDOM_DAY=$((WEEK_NUM % 5))   # 0=Mon .. 4=Fri
+          TODAY=$(date +%u)              # 1=Mon .. 7=Sun
+
+          if [ $TODAY -eq $((RANDOM_DAY+1)) ]; then
+            # If today is the random day → pick 3-5 commits
+            COUNT=$(( (RANDOM % 3) + 3 ))
+          else
+            # Otherwise → just 1 commit
+            COUNT=1
+          fi
+
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Make commits
+        run: |
+          for i in $(seq 1 ${{ steps.commits.outputs.count }}); do
+            echo "Run $i on $(date)" >> update.log
+            git config --global user.name "GitHub Action"
+            git config --global user.email "196634821+faqirullahafridi@users.noreply.github.com"
+            git add update.log
+            git commit -m "chore: keep green run $i on $(date)"
+            sleep 10
+          done
+          git push
